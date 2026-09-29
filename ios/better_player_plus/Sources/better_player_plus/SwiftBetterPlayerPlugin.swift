@@ -8,6 +8,9 @@ import MediaPlayer
 public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFactory {
     private let messenger: FlutterBinaryMessenger
     private var players: [Int64: BetterPlayer] = [:]
+    // setActive(false) is a synchronous round-trip to the audio server (~600 ms on device), so it runs off the
+    // main thread. Every later call waits for it first, which keeps the session operations in their call order.
+    private let audioSessionQueue = DispatchQueue(label: "better_player_plus.audio_session")
     private let registrar: FlutterPluginRegistrar
 
     private var dataSourceDict: [Int64: [String: Any]] = [:]
@@ -202,6 +205,7 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
 
 extension BetterPlayerPlugin {
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        audioSessionQueue.sync {}
         if call.method == "init" {
             for (_, player) in players { player.dispose() }
             players.removeAll()
@@ -258,7 +262,11 @@ extension BetterPlayerPlugin {
             disposeNotificationData(player)
             setRemoteCommandsNotificationNotActive()
             players.removeValue(forKey: textureId)
-            if players.isEmpty { try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation]) }
+            if players.isEmpty {
+                audioSessionQueue.async {
+                    try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+                }
+            }
             result(nil)
         case "setLooping":
             if let looping = (argsMap["looping"] as? NSNumber)?.boolValue { player.isLooping = looping }
