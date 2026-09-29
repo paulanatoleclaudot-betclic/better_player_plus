@@ -8,6 +8,7 @@ import MediaPlayer
 public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFactory {
     private let messenger: FlutterBinaryMessenger
     private var players: [Int64: BetterPlayer] = [:]
+    private let audioSessionDeactivationDelay: TimeInterval = 0.5
     private let registrar: FlutterPluginRegistrar
 
     private var dataSourceDict: [Int64: [String: Any]] = [:]
@@ -76,6 +77,16 @@ public class BetterPlayerPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFac
     private func setRemoteCommandsNotificationActive() {
         try? AVAudioSession.sharedInstance().setActive(true)
         UIApplication.shared.beginReceivingRemoteControlEvents()
+    }
+
+    // AVAudioSession.setActive(false) blocks the main thread (~600 ms on device) while the disposed
+    // player's audio I/O is still winding down. Deactivate once the pause has taken effect, and only if
+    // no player started meanwhile — it stays on the main queue, so it is ordered with their setup.
+    private func deactivateAudioSessionWhenIdle() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + audioSessionDeactivationDelay) { [weak self] in
+            guard let self = self, self.players.isEmpty else { return }
+            try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+        }
     }
 
     private func setRemoteCommandsNotificationNotActive() {
@@ -254,11 +265,12 @@ extension BetterPlayerPlugin {
             }
             result(nil)
         case "dispose":
+            player.pause()
             player.clear()
             disposeNotificationData(player)
             setRemoteCommandsNotificationNotActive()
             players.removeValue(forKey: textureId)
-            if players.isEmpty { try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation]) }
+            deactivateAudioSessionWhenIdle()
             result(nil)
         case "setLooping":
             if let looping = (argsMap["looping"] as? NSNumber)?.boolValue { player.isLooping = looping }
