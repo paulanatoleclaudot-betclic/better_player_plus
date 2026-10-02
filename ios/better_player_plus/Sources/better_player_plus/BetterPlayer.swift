@@ -518,7 +518,6 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
                 layer.frame = frame
                 layer.needsDisplayOnBoundsChange = true
                 rootVC.view.layer.addSublayer(layer)
-                rootVC.view.layer.needsDisplayOnBoundsChange = true
                 playerLayerRef = layer
                 pipController = nil
                 setupPipController()
@@ -532,7 +531,6 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
                 layer.frame = frame
                 layer.needsDisplayOnBoundsChange = true
                 rootVC.view.layer.addSublayer(layer)
-                rootVC.view.layer.needsDisplayOnBoundsChange = true
                 playerLayerRef = layer
                 pipController = nil
                 setupPipController()
