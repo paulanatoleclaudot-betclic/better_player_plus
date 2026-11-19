@@ -463,8 +463,9 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
         var width = size.width
         var height = size.height
 
-        let asset = player.currentItem!.asset
-        let onlyAudio = asset.tracks(withMediaType: .video).count == 0
+        // Read from the item, which has its tracks and duration once ready to play: the asset loads them
+        // synchronously on the main thread, which on a remote stream waits for the media server.
+        let onlyAudio = !(player.currentItem?.tracks.contains { $0.assetTrack?.mediaType == .video } ?? false)
         if !onlyAudio && height == .zero && width == .zero {
             return
         }
@@ -479,7 +480,7 @@ public class BetterPlayer: NSObject, FlutterPlatformView, FlutterStreamHandler, 
             height = abs(realSize.height) != 0 ? abs(realSize.height) : height
         }
 
-        let durMs = BetterPlayerTimeUtils.cmTimeToMillis(player.currentItem!.asset.duration)
+        let durMs = BetterPlayerTimeUtils.cmTimeToMillis(player.currentItem!.duration)
         if overriddenDuration > 0 && durMs > Int64(overriddenDuration) {
             player.currentItem?.forwardPlaybackEndTime = CMTimeMake(value: Int64(overriddenDuration/1000), timescale: 1)
         }
