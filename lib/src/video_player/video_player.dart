@@ -59,7 +59,8 @@ class VideoPlayerValue {
 
   /// The current absolute playback position.
   ///
-  /// Is null when is not available.
+  /// Not updated during playback: reading it costs iOS a wait on the main thread, so ask
+  /// [VideoPlayerController.absolutePosition] when it is needed. Is null when is not available.
   final DateTime? absolutePosition;
 
   /// The currently buffered ranges.
@@ -520,12 +521,13 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       if (_isDisposed) {
         return;
       }
+      // The absolute position is read on request only: on iOS it waits on the main thread for the
+      // player item, which a live stream holds for over half a second while it reloads its playlist.
       final Duration? newPosition = await position;
-      final DateTime? newAbsolutePosition = await absolutePosition;
       if (_isDisposed) {
         return;
       }
-      _updatePosition(newPosition, absolutePosition: newAbsolutePosition);
+      _updatePosition(newPosition);
       if (_seekPosition != null && newPosition != null) {
         final difference = newPosition.inMilliseconds - _seekPosition!.inMilliseconds;
         if (difference > 0) {
@@ -645,11 +647,8 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     await _videoPlayerPlatform.disablePictureInPicture(textureId);
   }
 
-  void _updatePosition(Duration? position, {DateTime? absolutePosition}) {
+  void _updatePosition(Duration? position) {
     value = value.copyWith(position: _seekPosition ?? position);
-    if (_seekPosition == null) {
-      value = value.copyWith(absolutePosition: absolutePosition);
-    }
   }
 
   Future<bool?> isPictureInPictureSupported() async {
